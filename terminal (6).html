@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Donut SMP | Terminal v2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap');
+        body { font-family: 'Space Grotesk', sans-serif; background-color: #050508; color: #e2e8f0; overflow: hidden; }
+        .glass { background: rgba(15, 15, 25, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+        .sidebar-item-active { background: linear-gradient(90deg, rgba(236,72,153,0.1) 0%, transparent 100%); border-left: 3px solid #ec4899; color: #f9a8d4; }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e1e2e; border-radius: 10px; }
+        .card-hover:hover { border-color: #ec4899 !important; transform: translateY(-2px); transition: all 0.2s ease; }
+        .msg-user { background: rgba(236,72,153,0.15); border: 1px solid rgba(236,72,153,0.3); border-radius: 18px 18px 4px 18px; }
+        .msg-ai { background: rgba(15,15,25,0.9); border: 1px solid rgba(255,255,255,0.07); border-radius: 4px 18px 18px 18px; }
+    </style>
+</head>
+<body>
+<div id="app" class="flex h-screen w-screen">
+
+    <!-- ═══════════════ SIDEBAR ═══════════════ -->
+    <aside class="w-72 glass flex flex-col border-r border-slate-800/50 hidden lg:flex">
+        <div class="p-8">
+            <h1 class="text-3xl font-black tracking-tighter text-pink-500">DONUT <span class="text-white">TERM</span></h1>
+            <p class="text-[10px] font-mono text-slate-500 uppercase tracking-[0.2em] mt-1">Live Auction Intelligence</p>
+        </div>
+
+        <nav class="flex-1 px-4 space-y-1">
+            <button @click="tab='dashboard'" :class="tab==='dashboard'?'sidebar-item-active':''" class="w-full flex items-center gap-4 px-4 py-3 rounded-r-xl text-slate-400 hover:text-white transition-all">
+                <i class="fa-solid fa-chart-line w-5"></i><span class="font-bold">Dashboard</span>
+            </button>
+            <button @click="tab='invest'" :class="tab==='invest'?'sidebar-item-active':''" class="w-full flex items-center gap-4 px-4 py-3 rounded-r-xl text-slate-400 hover:text-white transition-all">
+                <i class="fa-solid fa-gem w-5"></i><span class="font-bold">Investments</span>
+            </button>
+            <button @click="tab='flips'" :class="tab==='flips'?'sidebar-item-active':''" class="w-full flex items-center gap-4 px-4 py-3 rounded-r-xl text-slate-400 hover:text-white transition-all">
+                <i class="fa-solid fa-hammer w-5"></i><span class="font-bold">Craft Flips</span>
+            </button>
+            <button @click="tab='whales'" :class="tab==='whales'?'sidebar-item-active':''" class="w-full flex items-center gap-4 px-4 py-3 rounded-r-xl text-slate-400 hover:text-white transition-all">
+                <i class="fa-solid fa-eye w-5"></i><span class="font-bold">Whale Watch</span>
+            </button>
+            <button @click="tab='brain'" :class="tab==='brain'?'sidebar-item-active':''" class="w-full flex items-center gap-4 px-4 py-3 rounded-r-xl text-slate-400 hover:text-white transition-all">
+                <i class="fa-solid fa-brain w-5"></i><span class="font-bold">AI Brain</span>
+                <span v-if="status?.brain_set" class="ml-auto text-[9px] text-pink-400 font-black bg-pink-500/10 px-2 py-0.5 rounded-full">LIVE</span>
+            </button>
+        </nav>
+
+        <!-- Status card -->
+        <div class="p-4 m-4 glass rounded-2xl border border-slate-800/50">
+            <div class="flex items-center gap-2 mb-3">
+                <div :class="status ? 'bg-emerald-500' : 'bg-red-500'" class="w-2 h-2 rounded-full animate-pulse"></div>
+                <span :class="status ? 'text-emerald-400' : 'text-red-400'" class="text-[10px] font-black uppercase tracking-widest">
+                    {{ status ? 'Core Online' : 'Offline' }}
+                </span>
+            </div>
+            <div v-if="status" class="space-y-1 font-mono text-[11px] text-slate-500">
+                <div class="flex justify-between"><span>Listings:</span><span class="text-slate-300">{{(status.listings||0).toLocaleString()}}</span></div>
+                <div class="flex justify-between"><span>History:</span><span class="text-slate-300">{{(status.history_rows||0).toLocaleString()}} rows</span></div>
+                <div class="flex justify-between"><span>Database:</span><span class="text-slate-300">{{((status.db_kb||0)/1024).toFixed(1)}} MB</span></div>
+                <div class="flex justify-between"><span>HV Items:</span><span class="text-pink-400">{{status.hv_items_tracked||0}}</span></div>
+                <div class="flex justify-between"><span>AI Brain:</span><span :class="status.brain_set?'text-pink-400':'text-slate-600'">{{status.brain_set?'✓ Ready':'✗ Off'}}</span></div>
+            </div>
+            <div v-else class="text-[10px] text-slate-600 font-mono">Run server.py first</div>
+            <button @click="forceRefresh()" class="mt-3 w-full text-[10px] font-black text-slate-500 hover:text-pink-400 uppercase tracking-widest transition-colors">
+                ⟳ Force Refresh
+            </button>
+        </div>
+    </aside>
+
+    <!-- ═══════════════ MAIN ═══════════════ -->
+    <main class="flex-1 flex flex-col min-w-0 bg-[#050508]">
+
+        <!-- Header -->
+        <header class="h-20 glass flex items-center justify-between px-8 border-b border-slate-800/50 shrink-0">
+            <div class="flex items-center gap-4 flex-1 max-w-xl">
+                <div class="relative w-full">
+                    <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-600"></i>
+                    <input v-model="searchQ" placeholder="Search items, sellers…"
+                           class="w-full bg-[#0a0a0f] border border-slate-800 rounded-full py-2.5 pl-12 pr-4 text-sm focus:outline-none focus:border-pink-500/50 transition-all">
+                </div>
+            </div>
+            <div class="flex items-center gap-6 ml-6">
+                <div class="hidden md:block text-right">
+                    <p class="text-[10px] text-slate-500 uppercase font-bold">Next refresh</p>
+                    <p class="text-sm font-mono text-pink-400">{{countdown}}s</p>
+                </div>
+                <div class="w-10 h-10 rounded-full glass border border-pink-500/30 flex items-center justify-center text-pink-500">
+                    <i class="fa-solid fa-donut-large" style="font-size:16px">🍩</i>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content -->
+        <div class="flex-1 overflow-y-auto p-4 md:p-10 space-y-10">
+
+            <!-- Loading -->
+            <div v-if="loading" class="flex flex-col items-center justify-center h-64 gap-4">
+                <i class="fa-solid fa-circle-notch fa-spin text-4xl text-pink-500"></i>
+                <p class="font-mono text-xs uppercase tracking-widest text-slate-500">Connecting to market core…</p>
+                <p class="text-[10px] text-slate-600 font-mono">Make sure server.py is running</p>
+            </div>
+
+            <!-- ═══ DASHBOARD ═══ -->
+            <div v-if="tab==='dashboard' && !loading" class="space-y-10">
+
+                <!-- Stats row -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div v-for="s in summaryStats" :key="s.label" class="glass p-8 rounded-3xl relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-6xl text-white/5 group-hover:text-pink-500/10 transition-colors"><i :class="s.icon"></i></div>
+                        <p class="text-slate-500 text-xs uppercase font-black tracking-widest mb-1">{{s.label}}</p>
+                        <p class="text-4xl font-bold">{{s.value}}</p>
+                    </div>
+                </div>
+
+                <!-- Top movers -->
+                <div>
+                    <h2 class="text-2xl font-bold tracking-tight flex items-center gap-3 mb-6">
+                        <i class="fa-solid fa-bolt text-yellow-400"></i> Top Movers (24h)
+                    </h2>
+                    <div v-if="topMovers.length===0" class="text-slate-600 font-mono text-xs uppercase tracking-widest py-8 text-center">
+                        Accumulating price history — check back after a few fetches
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div v-for="item in topMovers" :key="item.item_id" @click="openModal(item)"
+                             class="glass p-5 rounded-2xl card-hover cursor-pointer border border-slate-800">
+                            <div class="flex justify-between items-start mb-3">
+                                <div class="flex items-center gap-2">
+                                    <img :src="texUrl(item.item_id)" class="w-7 h-7 rounded" style="image-rendering:pixelated" @error="$event.target.style.display='none'"/>
+                                    <span class="text-sm font-bold truncate max-w-[90px]">{{item.item_name}}</span>
+                                </div>
+                                <span :class="(item.pct_24h||0)>=0?'text-emerald-400 bg-emerald-500/10':'text-red-400 bg-red-500/10'"
+                                      class="text-[10px] font-black px-2 py-1 rounded-lg shrink-0 ml-1">
+                                    {{(item.pct_24h||0)>0?'+':''}}{{(item.pct_24h||0).toFixed(1)}}%
+                                </span>
+                            </div>
+                            <p class="text-xl font-bold font-mono text-pink-400">₿{{fmtN(item.current_min)}}</p>
+                            <p class="text-[10px] text-slate-500 mt-1 font-mono">med ₿{{fmtN(item.median_7d)}}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HV items on market now -->
+                <div>
+                    <h2 class="text-2xl font-bold tracking-tight flex items-center gap-3 mb-6">
+                        <i class="fa-solid fa-gem text-pink-400"></i> High Value On Market Now
+                    </h2>
+                    <div v-if="hvItems.length===0" class="text-slate-600 font-mono text-xs uppercase tracking-widest py-8 text-center">
+                        No high-value items listed right now
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        <div v-for="item in hvItems.slice(0,8)" :key="item.item_id" @click="openModal(item)"
+                             class="glass p-5 rounded-2xl card-hover cursor-pointer border border-slate-800">
+                            <div class="flex items-center gap-3 mb-3">
+                                <img :src="texUrl(item.item_id)" class="w-8 h-8 rounded object-contain" style="image-rendering:pixelated"
+                                     @error="$event.target.outerHTML='<span class=\'text-2xl\'>'+emoji(item.item_id)+'</span>'"/>
+                                <span class="text-sm font-bold truncate">{{item.item_name}}</span>
+                            </div>
+                            <p class="text-xl font-black font-mono text-pink-500">₿{{fmtN(item.min_price)}}</p>
+                            <div class="flex justify-between items-center mt-2 text-[10px] text-slate-500 font-mono">
+                                <span>{{item.listings}} listed</span>
+                                <span :class="(item.pct_24h||0)>=0?'text-emerald-400':'text-red-400'">
+                                    {{(item.pct_24h||0)>=0?'+':''}}{{(item.pct_24h||0).toFixed(1)}}%
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ INVESTMENTS ═══ -->
+            <div v-if="tab==='invest'" class="space-y-6">
+                <div class="flex flex-col md:flex-row justify-between items-end md:items-center gap-4">
+                    <h2 class="text-3xl font-black italic">INVESTMENT OPPORTUNITIES</h2>
+                    <div class="text-xs font-mono text-slate-500">High-value items only · Click for price chart</div>
+                </div>
+
+                <div v-if="investments.length===0" class="flex flex-col items-center justify-center py-24 gap-4">
+                    <i class="fa-solid fa-circle-notch fa-spin text-2xl text-pink-500"></i>
+                    <p class="font-mono text-xs uppercase tracking-widest text-slate-500">Waiting for first data fetch…</p>
+                    <p class="text-[10px] text-slate-600">This should appear within 60 seconds of server.py starting</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div v-for="item in filteredInvest" :key="item.item_id" @click="openModal(item)"
+                         class="glass p-6 rounded-3xl card-hover cursor-pointer group border border-slate-800">
+
+                        <!-- Header row: icon + trend badge -->
+                        <div class="flex justify-between items-center mb-5">
+                            <div class="w-12 h-12 glass rounded-2xl flex items-center justify-center overflow-hidden group-hover:scale-110 transition-transform shadow-lg shadow-black/50">
+                                <img :src="texUrl(item.item_id)" class="w-9 h-9 object-contain" style="image-rendering:pixelated"
+                                     @error="$event.target.outerHTML='<span style=\'font-size:22px\'>'+emoji(item.item_id)+'</span>'"/>
+                            </div>
+                            <div v-if="item.trend==='Mooning'" class="text-[10px] font-black text-emerald-400 flex items-center gap-1 uppercase bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">
+                                <i class="fa-solid fa-arrow-trend-up"></i> Mooning
+                            </div>
+                            <div v-else-if="item.trend==='Crashing'" class="text-[10px] font-black text-red-400 flex items-center gap-1 uppercase bg-red-500/10 px-2 py-1 rounded-full border border-red-500/20">
+                                <i class="fa-solid fa-arrow-trend-down"></i> Crashing
+                            </div>
+                            <div v-else class="text-[10px] font-black text-slate-400 uppercase bg-slate-800 px-2 py-1 rounded-full">Stable</div>
+                        </div>
+
+                        <!-- Name + prices -->
+                        <h3 class="text-xl font-bold mb-1 truncate">{{item.item_name}}</h3>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="text-2xl font-black font-mono text-pink-500">₿{{fmtN(item.current_min)}}</span>
+                        </div>
+                        <div class="flex gap-3 text-[11px] font-mono text-slate-500 mb-3">
+                            <span>med ₿{{fmtN(item.median_7d)}}</span>
+                            <span>·</span>
+                            <span>x64 ₿{{fmtN((item.current_min||0)*64)}}</span>
+                        </div>
+
+                        <!-- 24h change -->
+                        <div v-if="item.pct_24h!=null" class="text-xs font-mono font-bold mb-4"
+                             :class="item.pct_24h>=0?'text-emerald-400':'text-red-400'">
+                            {{item.pct_24h>=0?'▲':'▼'}} {{Math.abs(item.pct_24h).toFixed(1)}}% today
+                        </div>
+                        <div v-else class="text-xs font-mono text-slate-600 mb-4">— no 24h data yet</div>
+
+                        <!-- Footer -->
+                        <div class="pt-4 border-t border-slate-800/50 flex justify-between items-center text-[11px] font-bold">
+                            <span class="text-slate-600 uppercase tracking-widest">
+                                {{item.history_count > 0 ? item.history_count+' data pts' : 'first fetch'}}
+                            </span>
+                            <span class="text-slate-400 group-hover:text-pink-400 flex items-center gap-1 uppercase transition-colors">
+                                Chart <i class="fa-solid fa-chevron-right text-[8px]"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ FLIPS ═══ -->
+            <div v-if="tab==='flips'" class="max-w-5xl space-y-6">
+                <h2 class="text-3xl font-black italic">PROFITABLE CRAFTING</h2>
+                <div v-if="flips.length===0" class="text-center py-20 text-slate-600">
+                    <i class="fa-solid fa-hammer text-4xl mb-4 block"></i>
+                    <p class="font-mono text-xs uppercase tracking-widest">No flip data yet — market data loading</p>
+                </div>
+                <div class="space-y-4">
+                    <div v-for="f in flips" :key="f.output" class="glass p-6 rounded-3xl border border-slate-800 flex flex-col md:flex-row items-center gap-8 relative">
+                        <div v-if="f.hot" class="absolute -top-2 -left-2 bg-pink-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase italic shadow-lg shadow-pink-500/20">🔥 Hot Flip</div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-2xl font-bold mb-2">{{f.output}}</h3>
+                            <div class="flex flex-wrap gap-2 text-[10px] font-mono text-slate-500">
+                                <span v-for="ing in f.ingredients" class="bg-slate-900 border border-slate-800 px-3 py-1 rounded-lg">
+                                    {{ing.qty}}× {{ing.item}} @ ₿{{fmtN(ing.unit)}}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4 text-center">
+                            <div class="px-4 py-2 bg-[#0a0a0f] rounded-xl border border-slate-800">
+                                <p class="text-[9px] text-slate-500 uppercase font-black">Mats Cost</p>
+                                <p class="font-mono text-slate-300">₿{{fmtN(f.craft_cost)}}</p>
+                            </div>
+                            <i class="fa-solid fa-arrow-right text-slate-700"></i>
+                            <div class="px-4 py-2 bg-[#0a0a0f] rounded-xl border border-slate-800">
+                                <p class="text-[9px] text-slate-500 uppercase font-black">Sell</p>
+                                <p class="font-mono font-bold text-white">₿{{fmtN(f.sell_price)}}</p>
+                            </div>
+                        </div>
+                        <div class="md:w-36 text-right">
+                            <p class="text-emerald-400 text-xl font-black">+₿{{fmtN(f.profit)}}</p>
+                            <p class="text-emerald-500 text-[10px] font-black uppercase tracking-tighter">+{{f.profit_pct.toFixed(1)}}% ROI</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ WHALE WATCH ═══ -->
+            <div v-if="tab==='whales'" class="max-w-4xl space-y-6">
+                <h2 class="text-3xl font-black italic">MARKET RADAR</h2>
+                <div v-if="alerts.length===0" class="text-center py-20 text-slate-600">
+                    <i class="fa-solid fa-eye text-4xl mb-4 block"></i>
+                    <p class="font-mono text-xs uppercase tracking-widest">No alerts — market looks quiet</p>
+                </div>
+                <div class="space-y-3">
+                    <div v-for="a in alerts" :key="a.id"
+                         class="glass p-5 rounded-2xl border-l-4 border-l-pink-500 bg-pink-500/5 flex gap-5 items-start">
+                        <div class="w-10 h-10 bg-pink-500/10 rounded-full flex items-center justify-center text-pink-500 shrink-0">
+                            <i :class="a.alert_type==='whale'?'fa-solid fa-eye':'fa-solid fa-hammer'"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-sm font-medium leading-relaxed text-slate-200">{{a.message}}</p>
+                            <p class="text-[10px] text-slate-500 mt-2 uppercase font-mono tracking-widest">{{timeAgo(a.created_at)}} · SYSTEM FEED</p>
+                        </div>
+                        <button @click="dismissAlert(a.id)" class="text-slate-700 hover:text-red-400 transition-colors shrink-0 mt-1">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ AI BRAIN ═══ -->
+            <div v-if="tab==='brain'" class="max-w-5xl space-y-6 h-full flex flex-col" style="height: calc(100vh - 160px)">
+                <div class="flex items-center gap-3 shrink-0">
+                    <h2 class="text-3xl font-black italic">AI BRAIN</h2>
+                    <span class="text-[10px] font-black text-pink-400 bg-pink-500/10 border border-pink-500/20 px-3 py-1 rounded-full uppercase">Claude-powered</span>
+                    <span v-if="!status?.brain_set" class="text-[10px] text-slate-600 font-mono">set CLAUDE_KEY in server env</span>
+                </div>
+                <div class="glass rounded-3xl border border-slate-800 overflow-hidden flex flex-col flex-1">
+                    <!-- Messages -->
+                    <div class="flex-1 overflow-y-auto p-8 space-y-4" id="chat-messages">
+                        <div v-if="chatMsgs.length===0" class="flex flex-col items-center justify-center py-16 gap-3">
+                            <i class="fa-solid fa-brain text-5xl text-pink-500/20"></i>
+                            <p class="text-slate-500 font-mono text-xs uppercase tracking-widest">AI Brain Ready</p>
+                            <p class="text-slate-600 text-sm text-center max-w-sm">Ask anything about the Donut SMP market — prices, trends, what to buy or sell.</p>
+                        </div>
+                        <div v-for="m in chatMsgs" :key="m.id" :class="m.role==='user'?'flex justify-end':'flex justify-start'">
+                            <div :class="m.role==='user'?'msg-user':'msg-ai'" class="px-5 py-3 max-w-[80%] text-sm leading-relaxed">
+                                <div v-if="m.thinking" class="flex items-center gap-2 text-slate-500">
+                                    <i class="fa-solid fa-circle-notch fa-spin text-pink-500 text-xs"></i>
+                                    <span class="font-mono text-xs">Analyzing market data…</span>
+                                </div>
+                                <div v-else v-html="m.html||m.text"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Quick prompts -->
+                    <div class="px-8 pb-3 flex flex-wrap gap-2 shrink-0">
+                        <button v-for="q in quickPrompts" :key="q.s" @click="sendBrain(q.t)"
+                                class="text-[10px] font-bold bg-slate-900 border border-slate-800 text-slate-400 hover:text-pink-400 hover:border-pink-500/30 px-3 py-1.5 rounded-full transition-all">
+                            {{q.s}}
+                        </button>
+                    </div>
+                    <!-- Input -->
+                    <div class="p-5 border-t border-slate-800 flex gap-3 shrink-0">
+                        <input v-model="brainInput" @keydown.enter="sendBrain()"
+                               placeholder="Ask the AI Brain anything…"
+                               class="flex-1 bg-[#0a0a0f] border border-slate-800 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-pink-500/50 transition-all">
+                        <button @click="sendBrain()" :disabled="brainBusy"
+                                class="px-6 py-3 bg-pink-500 hover:bg-pink-400 disabled:opacity-40 text-white font-bold rounded-2xl transition-all text-sm">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /content -->
+    </main><!-- /main -->
+
+    <!-- ═══════════════ MODAL ═══════════════ -->
+    <div v-if="modalItem" @click.self="modalItem=null"
+         class="fixed inset-0 z-50 bg-[#050508]/90 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="glass w-full max-w-6xl rounded-[40px] overflow-hidden flex flex-col shadow-2xl shadow-pink-500/5 border border-slate-800/80" style="max-height:90vh">
+
+            <div class="p-8 md:p-12 border-b border-slate-800/50 flex justify-between items-start shrink-0">
+                <div>
+                    <div class="flex items-center gap-4 mb-2">
+                        <img :src="texUrl(modalItem.item_id)" class="w-10 h-10 rounded object-contain" style="image-rendering:pixelated"
+                             @error="$event.target.outerHTML='<span style=\'font-size:28px\'>'+emoji(modalItem.item_id)+'</span>'"/>
+                        <h2 class="text-4xl font-black text-white">{{modalItem.item_name}}</h2>
+                        <span v-if="modalItem.pct_24h!=null"
+                              :class="modalItem.pct_24h>=0?'text-emerald-400 border-emerald-800':'text-red-400 border-red-900'"
+                              class="text-base font-bold bg-slate-900 px-4 py-1 rounded-full border">
+                            {{modalItem.pct_24h>0?'+':''}}{{modalItem.pct_24h.toFixed(2)}}%
+                        </span>
+                    </div>
+                    <div class="flex gap-10 mt-6">
+                        <div>
+                            <p class="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Floor Price</p>
+                            <p class="text-3xl font-bold font-mono text-pink-500">₿{{fmtN(modalItem.current_min||modalItem.min_price)}}</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">7D Median</p>
+                            <p class="text-3xl font-bold font-mono text-slate-300">₿{{fmtN(modalItem.median_7d||modalItem.avg_price)}}</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Stack (×64)</p>
+                            <p class="text-3xl font-bold font-mono text-slate-400">₿{{fmtN((modalItem.current_min||modalItem.min_price||0)*64)}}</p>
+                        </div>
+                    </div>
+                </div>
+                <button @click="modalItem=null" class="w-12 h-12 glass rounded-full flex items-center justify-center hover:bg-slate-800 transition-colors text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 p-8 md:p-12 flex flex-col overflow-hidden">
+                <div class="flex gap-2 mb-6 bg-[#0a0a0f] p-1 rounded-2xl w-fit border border-slate-800">
+                    <button v-for="t in chartTimes" :key="t.v" @click="loadChart(t.v)"
+                            :class="chartDays===t.v?'bg-pink-500 text-white shadow-lg':'text-slate-500 hover:text-white'"
+                            class="px-6 py-2 text-xs font-black rounded-xl transition-all">{{t.l}}</button>
+                </div>
+                <div v-if="chartEmpty" class="flex-1 flex flex-col items-center justify-center gap-3 text-slate-600">
+                    <i class="fa-solid fa-chart-line text-4xl"></i>
+                    <p class="font-mono text-xs uppercase tracking-widest">No price history yet — keep server running to build data</p>
+                </div>
+                <div v-else id="modal-chart" class="flex-1" style="min-height:280px"></div>
+            </div>
+        </div>
+    </div>
+
+</div><!-- /app -->
+
+<script>
+const { createApp, ref, computed, onMounted, onUnmounted, nextTick, watch } = Vue;
+
+createApp({
+    setup() {
+        // ══ CONFIG ══
+        // LOCAL:  keep as http://127.0.0.1:7771
+        // RENDER: change to https://YOUR-APP-NAME.onrender.com
+        const API = "http://127.0.0.1:7771";
+        const TEX = "https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.21/assets/minecraft/textures/item/";
+
+        const EMOJIS = {
+            "minecraft:elytra":"🪶","minecraft:netherite_ingot":"⬛","minecraft:netherite_block":"🟫",
+            "minecraft:ancient_debris":"🟤","minecraft:dragon_egg":"🥚","minecraft:dragon_head":"🐉",
+            "minecraft:nether_star":"⭐","minecraft:beacon":"🔦","minecraft:totem_of_undying":"🪆",
+            "minecraft:shulker_shell":"🟪","minecraft:enchanted_book":"📗","minecraft:trident":"🔱",
+            "minecraft:diamond":"💎","minecraft:diamond_block":"🔷","minecraft:gold_ingot":"🪙",
+            "minecraft:wither_skeleton_skull":"💀","minecraft:piglin_head":"👺",
+            "minecraft:enchanted_golden_apple":"🍎","minecraft:beacon":"🔦",
+        };
+
+        // ══ STATE ══
+        const tab         = ref("dashboard");
+        const loading     = ref(true);
+        const searchQ     = ref("");
+        const investments = ref([]);
+        const flips       = ref([]);
+        const alerts      = ref([]);
+        const status      = ref(null);
+        const hvItems     = ref([]);
+        const modalItem   = ref(null);
+        const chartDays   = ref(7);
+        const chartEmpty  = ref(false);
+        const countdown   = ref(60);
+        const brainInput  = ref("");
+        const brainBusy   = ref(false);
+        const chatMsgs    = ref([]);
+        let chart = null, msgId = 0, timer = null;
+
+        const chartTimes = [{l:"1D",v:1},{l:"7D",v:7},{l:"30D",v:30},{l:"90D",v:90}];
+        const quickPrompts = [
+            {s:"📊 Full analysis",  t:"Give me a full market analysis. What should I buy, sell, or hold?"},
+            {s:"🚀 What's mooning?", t:"What high-value items are mooning? Should I buy them?"},
+            {s:"📉 What's crashing?",t:"What items are crashing? Buy-the-dip opportunity?"},
+            {s:"🔨 Best flip?",      t:"What's the best craft flip for profit right now? Give prices."},
+            {s:"🪶 Elytra?",        t:"Analyze Elytra — price trend, supply, buy or sell?"},
+            {s:"⬛ Netherite?",      t:"Analyze Netherite Ingot — is now a good time to buy?"},
+        ];
+
+        // ══ HELPERS ══
+        const texUrl = iid => TEX + iid.replace("minecraft:","") + ".png";
+        const emoji  = iid => EMOJIS[iid] || "📦";
+        const fmtN   = n => {
+            if(n==null||isNaN(n)) return "—";
+            if(n>=1e9) return (n/1e9).toFixed(2)+"B";
+            if(n>=1e6) return (n/1e6).toFixed(2)+"M";
+            if(n>=1e3) return (n/1e3).toFixed(1)+"K";
+            return Math.round(n).toLocaleString();
+        };
+        const timeAgo = ts => {
+            if(!ts) return "—";
+            const s = Math.floor(Date.now()/1000 - ts);
+            return s<60 ? s+"s ago" : s<3600 ? Math.floor(s/60)+"m ago" : Math.floor(s/3600)+"h ago";
+        };
+
+        // ══ API ══
+        const get = async path => {
+            try { const r = await fetch(API+path); return r.ok ? r.json() : null; }
+            catch { return null; }
+        };
+
+        // ══ LOAD DATA ══
+        const loadAll = async () => {
+            const [inv, flp, alt, stat, hv] = await Promise.all([
+                get("/api/investments"),
+                get("/api/flips"),
+                get("/api/alerts?limit=30"),
+                get("/api/status"),
+                get("/api/hv"),
+            ]);
+            if(inv)  investments.value = inv;
+            if(flp)  flips.value = flp;
+            if(alt)  alerts.value = alt;
+            if(stat) status.value = stat;
+            if(hv)   hvItems.value = hv;
+            loading.value = false;
+        };
+
+        // ══ COMPUTED ══
+        const filteredInvest = computed(() => {
+            const q = searchQ.value.toLowerCase();
+            return q ? investments.value.filter(i => i.item_name.toLowerCase().includes(q)) : investments.value;
+        });
+
+        const topMovers = computed(() =>
+            [...investments.value].filter(i => i.pct_24h != null)
+                .sort((a,b) => Math.abs(b.pct_24h) - Math.abs(a.pct_24h)).slice(0,4)
+        );
+
+        const summaryStats = computed(() => [
+            {label:"Active Listings",    value:(status.value?.listings||0).toLocaleString(), icon:"fa-solid fa-list-ul"},
+            {label:"HV Items On Market", value:hvItems.value.length,                         icon:"fa-solid fa-gem"},
+            {label:"Active Alerts",      value:alerts.value.length,                          icon:"fa-solid fa-bell"},
+        ]);
+
+        // ══ CHART MODAL ══
+        const openModal = async item => {
+            modalItem.value = item;
+            chartDays.value = 7;
+            chartEmpty.value = false;
+            if(chart) { chart.destroy(); chart = null; }
+            await nextTick();
+            await loadChart(7);
+        };
+
+        const loadChart = async days => {
+            chartDays.value = days;
+            if(!modalItem.value) return;
+            const data = await get(`/api/history?item=${encodeURIComponent(modalItem.value.item_id)}&days=${days}`);
+            if(!data || data.length === 0) { chartEmpty.value = true; return; }
+            chartEmpty.value = false;
+            const series = data.map(pt => ({x: new Date(pt.recorded_at*1000), y: Math.round(pt.p)}));
+            const opts = {
+                series:[{name:"Price (₿)", data:series}],
+                chart:{type:"area", height:"100%", toolbar:{show:false}, background:"transparent", animations:{speed:350}},
+                colors:["#ec4899"],
+                stroke:{curve:"smooth", width:2.5},
+                fill:{type:"gradient", gradient:{shadeIntensity:1, opacityFrom:0.35, opacityTo:0.01}},
+                dataLabels:{enabled:false},
+                theme:{mode:"dark"},
+                grid:{borderColor:"#1e293b40", strokeDashArray:4},
+                xaxis:{type:"datetime", labels:{style:{colors:"#64748b", fontSize:"11px"}}},
+                yaxis:{labels:{formatter:v=>"₿"+fmtN(v), style:{colors:"#64748b", fontSize:"11px"}}},
+                tooltip:{theme:"dark", x:{format:"dd MMM HH:mm"}},
+            };
+            if(chart) { chart.destroy(); chart = null; }
+            await nextTick();
+            const el = document.getElementById("modal-chart");
+            if(el) { chart = new ApexCharts(el, opts); await chart.render(); }
+        };
+
+        watch(modalItem, v => { if(!v && chart) { chart.destroy(); chart = null; } });
+
+        // ══ ALERTS ══
+        const dismissAlert = async id => {
+            await fetch(API+"/api/alerts/dismiss", {
+                method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({id})
+            }).catch(()=>{});
+            alerts.value = alerts.value.filter(a => a.id !== id);
+        };
+
+        // ══ REFRESH ══
+        const forceRefresh = async () => {
+            await fetch(API+"/api/fetch", {method:"POST"}).catch(()=>{});
+            setTimeout(loadAll, 5000);
+            countdown.value = 60;
+        };
+
+        // ══ AI BRAIN ══
+        const sendBrain = async (promptText) => {
+            const q = promptText || brainInput.value.trim();
+            if(!q || brainBusy.value) return;
+            brainInput.value = "";
+            chatMsgs.value.push({id:msgId++, role:"user", text:q});
+            const tid = msgId++;
+            chatMsgs.value.push({id:tid, role:"ai", thinking:true});
+            await nextTick();
+            const el = document.getElementById("chat-messages");
+            if(el) el.scrollTop = el.scrollHeight;
+            brainBusy.value = true;
+            try {
+                const r = await fetch(API+"/api/brain", {
+                    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({question:q})
+                });
+                const d = await r.json();
+                const raw = d.answer || "No response.";
+                const html = raw
+                    .replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>")
+                    .replace(/#{1,3} (.*)/g,"<p class='font-bold text-pink-400 mt-2 mb-1'>$1</p>")
+                    .replace(/`([^`]+)`/g,"<code class='bg-slate-800 px-1 rounded text-pink-300 text-xs font-mono'>$1</code>")
+                    .replace(/\n\n/g,"<br><br>").replace(/\n/g,"<br>");
+                const idx = chatMsgs.value.findIndex(m => m.id===tid);
+                if(idx!==-1) chatMsgs.value[idx] = {id:tid, role:"ai", text:raw, html};
+            } catch(e) {
+                const idx = chatMsgs.value.findIndex(m => m.id===tid);
+                if(idx!==-1) chatMsgs.value[idx] = {id:tid, role:"ai", text:"⚠ Could not reach AI Brain. Is server running and CLAUDE_KEY set?"};
+            }
+            brainBusy.value = false;
+            await nextTick();
+            const el2 = document.getElementById("chat-messages");
+            if(el2) el2.scrollTop = el2.scrollHeight;
+        };
+
+        // ══ LIFECYCLE ══
+        const onKey = e => { if(e.key==="Escape") modalItem.value = null; };
+
+        onMounted(() => {
+            loadAll();
+            document.addEventListener("keydown", onKey);
+            timer = setInterval(() => {
+                countdown.value--;
+                if(countdown.value <= 0) { countdown.value = 60; loadAll(); }
+            }, 1000);
+        });
+
+        onUnmounted(() => {
+            document.removeEventListener("keydown", onKey);
+            clearInterval(timer);
+            if(chart) chart.destroy();
+        });
+
+        return {
+            tab, loading, searchQ, investments, flips, alerts, status, hvItems,
+            modalItem, chartDays, chartEmpty, countdown,
+            brainInput, brainBusy, chatMsgs,
+            filteredInvest, topMovers, summaryStats, chartTimes, quickPrompts,
+            texUrl, emoji, fmtN, timeAgo,
+            openModal, loadChart, dismissAlert, forceRefresh, sendBrain,
+        };
+    }
+}).mount("#app");
+</script>
+</body>
+</html>
